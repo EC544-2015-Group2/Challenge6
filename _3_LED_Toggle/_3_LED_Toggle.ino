@@ -1,15 +1,44 @@
-const int buttonPin = 8;    // the number of the pushbutton pin
-const int bluePin = 13;     
+/*
+ Debounce
+
+ Each time the input pin goes from LOW to HIGH (e.g. because of a push-button
+ press), the output pin is toggled from LOW to HIGH or HIGH to LOW.  There's
+ a minimum delay between toggles to debounce the circuit (i.e. to ignore
+ noise).
+
+ The circuit:
+ * LED attached from pin 13 to ground
+ * pushbutton attached from pin 2 to +5V
+ * 10K resistor attached from pin 2 to ground
+
+ * Note: On most Arduino boards, there is already an LED on the board
+ connected to pin 13, so you don't need any extra components for this example.
+
+
+ created 21 November 2006
+ by David A. Mellis
+ modified 30 Aug 2011
+ by Limor Fried
+ modified 28 Dec 2012
+ by Mike Walters
+
+ This example code is in the public domain.
+
+ http://www.arduino.cc/en/Tutorial/Debounce
+ */
+
+// constants won't change. They're used here to
+// set pin numbers:
+const int buttonPin = 5;    // the number of the pushbutton pin    
 const int redPin = 12;     
-const int greenPin = 11;     
+const int greenPin = 13;     
 
 long lastDebounceTime = 0;  // the last time the output pin was toggled
 long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
 // Variables will change:
-int blueState = HIGH;         // the current state of the output pin
 int redState = LOW;         // the current state of the output pin
-int greenState = LOW;         // the current state of the output pin
+int greenState = HIGH;         // the current state of the output pin
 int buttonState;             // the current reading from the input pin
 int lastButtonState = LOW;   // the previous reading from the input pin
 
@@ -18,11 +47,9 @@ int count = 0;
 void setup() {
   // put your setup code here, to run once:
   pinMode(buttonPin, INPUT);
-  pinMode(bluePin, OUTPUT);
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
   // set initial LED state
-  digitalWrite(bluePin, blueState);
   digitalWrite(redPin, redState);
   digitalWrite(greenPin, greenState);
 }
@@ -46,33 +73,23 @@ void loop() {
       if (buttonState == HIGH) {
         count++;
         if(count==0) {
-          blueState=HIGH;
-          greenState=LOW;
+          greenState=HIGH;
           redState =LOW;
         }
         if(count==1) {
-          blueState = LOW;
           redState = HIGH;
           greenState = LOW;
         }
         if(count==2) {
           redState = LOW;
           greenState = HIGH;
-          blueState = LOW;
-        }
-        if(count==3) {
-          count=0;
-           blueState=HIGH;
-          greenState=LOW;
-          redState =LOW;
+          count = 0;
         }
       }
     }
   }
 
   // set the LED:
-
-    digitalWrite(bluePin, blueState);
     digitalWrite(redPin, redState);
     digitalWrite(greenPin, greenState);
 
