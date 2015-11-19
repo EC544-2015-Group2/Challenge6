@@ -16,13 +16,12 @@ void setup() {
 	digitalWrite(button_pin, HIGH);
 	pinMode(red_led, OUTPUT);
   pinMode(green_led, OUTPUT);
-	digitalWrite(red_led, HIGH);
-  digitalWrite(green_led, LOW);
+	digitalWrite(red_led, LOW);
+  digitalWrite(green_led, HIGH);
 }
 
 void loop() {
 	int reading = digitalRead(button_pin);
-//  Serial.print(digitalRead(button_pin));
 	if(reading != last_button_state)	debounce_timestamp = millis();
 	if(millis() - debounce_timestamp > debounce_delay){
 		if(reading != button_state){
