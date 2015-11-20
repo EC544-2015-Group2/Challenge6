@@ -1,9 +1,9 @@
 #include <XBee.h>
 #include <SoftwareSerial.h>
 
-#define PIN_BLUE_LED    11   // leader
-#define PIN_RED_LED     12    // infected follower
-#define PIN_GREEN_LED   13  // follower
+#define PIN_BLUE_LED    11    // leader
+#define PIN_RED_LED     12    // infected
+#define PIN_GREEN_LED   13    // clear
 
 #define MSG_ELECTION    0xB0
 #define MSG_INFECTION   0xB1
@@ -16,7 +16,7 @@ ZBRxResponse rxResponse = ZBRxResponse();
 
 uint16_t myAddress16;
 uint16_t listAddress16[10];
-int state = 0;
+int state = 0;  // 0 is follower and 1 is leader
 bool infected = false;
 
 void setup() {
@@ -25,6 +25,38 @@ void setup() {
   xbee.begin(xbeeSerial);
   delay(2000);
 
+  initLedPins();
+  myAddress16 = getMyAddress16();  
+}
+
+void loop() {
+  xbee.readPacket();
+  if (xbee.getResponse().isAvailable() && xbee.getResponse().getApiId() == ZB_RX_RESPONSE) {
+    xbee.getResponse().getZBRxResponse(rxResponse);
+    switch(state){
+      case 0:
+        break;
+      case 1:
+        break;
+    }
+    // if (state == 2 && > rxResponse.getRemoteAddress16() > myDevice16) {
+    //   txRequest.setAddress64(0x00000000, 0x0000FFFF);
+    //   txRequest.setPayload(ELECTION);
+    //   txRequest.setPayloadLength(1);
+    //   xbee.send(txRequest);
+    //   state = 1;
+    // } else if (state != 2 && rxResponse.getData(0) == INFECTION) {
+    //   digitalWrite(BLUE_LED, LOW);
+    //   digitalWrite(RED_LED, HIGH);
+    //   digitalWrite(GREEN_LED, LOW);
+    //   infection = true;
+    // } else {
+    //   state = 0;
+    // }
+  }
+}
+
+void initLedPins(){
   pinMode(BLUE_LED, OUTPUT);
   pinMode(RED_LED, OUTPUT);
   pinMode(GREEN_LED, OUTPUT);
@@ -32,7 +64,9 @@ void setup() {
   digitalWrite(BLUE_LED, LOW);
   digitalWrite(RED_LED, LOW);
   digitalWrite(GREEN_LED, HIGH);
+}
 
+uint16_t getMyAddress16(){
   do{
     do  xbee.send(AtCommandRequest((uint8_t*){'M','Y'}));
     while (!xbee.readPacket(5000) || xbee.getResponse().getApiId != AT_COMMAND_RESPONSE);
@@ -41,28 +75,12 @@ void setup() {
     xbee.getResponse().getAtCommandResponse(atResponse);
   } while (!atResponse.isOk());
 
-  myAddress16 = atResponse.getValue(0) << 8 + atResponse.getValue(1);
+  return atResponse.getValue(0) << 8 + atResponse.getValue(1);
 }
 
-void loop() {
-  xbee.readPacket();
-  if (xbee.getResponse().isAvailable() && xbee.getResponse().getApiId() == ZB_RX_RESPONSE) {
-    xbee.getResponse().getZBRxResponse(rxResponse);
-    if (state == 2 && > rxResponse.getRemoteAddress16() > myDevice16) {
-      txRequest.setAddress64(0x00000000, 0x0000FFFF);
-      txRequest.setPayload(ELECTION);
-      txRequest.setPayloadLength(1);
-      xbee.send(txRequest);
-      state = 1;
-    } else if (state != 2 && rxResponse.getData(0) == INFECTION) {
-      digitalWrite(BLUE_LED, LOW);
-      digitalWrite(RED_LED, HIGH);
-      digitalWrite(GREEN_LED, LOW);
-      infection = true;
-    } else {
-      state = 0;
-    }
-  }
+
+
+
 
 // Anything below this line has not been reviewed. 
 
