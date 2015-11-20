@@ -1,24 +1,23 @@
 #include <XBee.h>
 #include <SoftwareSerial.h>
 
+#define PIN_BLUE_LED    11   // leader
+#define PIN_RED_LED     12    // infected follower
+#define PIN_GREEN_LED   13  // follower
+
+#define MSG_ELECTION    0xB0
+#define MSG_INFECTION   0xB1
+#define MSG_CLEAR       0xB2
+#define MSG_DISCOVERY   0xB3
+
 XBee xbee = XBee();
 SoftwareSerial xbeeSerial(2, 3);
 ZBRxResponse rxResponse = ZBRxResponse();
-ZBTxRequest txRequest = ZBTxRequest();
 
-int myDevice16;
-int moteIDs[1];
+uint16_t myAddress16;
+uint16_t listAddress16[10];
 int state = 0;
-
-const uint8_t ELECTION = 0xB0,
-              INFECTION = 0xB1,
-              CLEAR = 0xB2;
-
-boolean infected = false;
-
-const int blueLED = 11,   // leader
-          redLED = 12,    // infected follower
-          greenLED = 13;  // follower
+bool infected = false;
 
 void setup() {
   Serial.begin(57600);
@@ -26,30 +25,29 @@ void setup() {
   xbee.begin(xbeeSerial);
   delay(2000);
 
-  pinMode(blueLED, OUTPUT);
-  pinMode(redLED, OUTPUT);
-  pinMode(greenLED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  pinMode(GREEN_LED, OUTPUT);
 
-  digitalWrite(blueLED, LOW);
-  digitalWrite(redLED, LOW);
-  digitalWrite(greenLED, HIGH);
+  digitalWrite(BLUE_LED, LOW);
+  digitalWrite(RED_LED, LOW);
+  digitalWrite(GREEN_LED, HIGH);
 }
 
 void loop() {
   xbee.readPacket();
   if (xbee.getResponse().isAvailable() && xbee.getResponse().getApiId() == ZB_RX_RESPONSE) {
     xbee.getResponse().getZBRxResponse(rxResponse);
-    int address16 = rxResponse.getRemoteAddress16();
-    if (state == 2 && address16 > myDevice16) {
+    if (state == 2 && > rxResponse.getRemoteAddress16() > myDevice16) {
       txRequest.setAddress64(0x00000000, 0x0000FFFF);
       txRequest.setPayload(ELECTION);
       txRequest.setPayloadLength(1);
       xbee.send(txRequest);
       state = 1;
     } else if (state != 2 && rxResponse.getData(0) == INFECTION) {
-      digitalWrite(blueLED, LOW);
-      digitalWrite(redLED, HIGH);
-      digitalWrite(greenLED, LOW);
+      digitalWrite(BLUE_LED, LOW);
+      digitalWrite(RED_LED, HIGH);
+      digitalWrite(GREEN_LED, LOW);
       infection = true;
     } else {
       state = 0;
@@ -87,8 +85,8 @@ void loop() {
           }
         }
         if (rxResponse.getData(0) == "INFECT") {
-          digitalWrite(redLED, HIGH);
-          digitalWrite(greenLED, LOW);
+          digitalWrite(RED_LED, HIGH);
+          digitalWrite(GREEN_LED, LOW);
         }
 
       }
