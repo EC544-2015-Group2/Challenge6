@@ -32,6 +32,16 @@ void setup() {
   digitalWrite(BLUE_LED, LOW);
   digitalWrite(RED_LED, LOW);
   digitalWrite(GREEN_LED, HIGH);
+
+  do{
+    do  xbee.send(AtCommandRequest((uint8_t*){'M','Y'}));
+    while (!xbee.readPacket(5000) || xbee.getResponse().getApiId != AT_COMMAND_RESPONSE);
+
+    AtCommandResponse atResponse = AtCommandResponse();
+    xbee.getResponse().getAtCommandResponse(atResponse);
+  } while (!atResponse.isOk());
+
+  myAddress16 = atResponse.getValue(0) << 8 + atResponse.getValue(1);
 }
 
 void loop() {
