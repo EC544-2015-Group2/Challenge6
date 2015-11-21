@@ -15,7 +15,8 @@ case MSG_INFECTION:
     digitalWrite(PIN_BLUE_LED, LOW);
     digitalWrite(PIN_RED_LED, HIGH);
     digitalWrite(PIN_GREEN_LED, LOW);
-    xbee.send(ZBTxRequest(XBeeAddress64(0x00000000, 0x0000FFFF, (uint8_t*) MSG_INFECT, 1));    
+    txRequest = ZBTxRequest(XBeeAddress64(0x00000000, 0x0000FFFF, (uint8_t*) MSG_INFECT, 1);
+    xbee.send(txRequest);    
   }
   break;
 case MSG_CLEAR:
@@ -24,7 +25,8 @@ case MSG_CLEAR:
     digitalWrite(PIN_BLUE_LED, LOW);
     digitalWrite(PIN_RED_LED, LOW);
     digitalWrite(PIN_GREEN_LED, HIGH);
-    xbee.send(ZBTxRequest(XBeeAddress64(0x00000000, 0x0000FFFF, (uint8_t*) MSG_CLEAR, 1));    
+    ZBTxRequest(XBeeAddress64(0x00000000, 0x0000FFFF, (uint8_t*) MSG_CLEAR, 1);
+    xbee.send(txRequest);    
   }
   break;
 
