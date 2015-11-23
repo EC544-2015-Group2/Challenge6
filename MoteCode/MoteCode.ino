@@ -4,10 +4,11 @@
 #define PIN_BLUE_LED              11    // leader
 #define PIN_RED_LED               12    // infected
 #define PIN_GREEN_LED             13    // clear
+#define button_pin                5     // button
 
 #define ELECTION_REPLY_WAIT_PERIOD      1000
 #define ELECTION_VICTORY_WAIT_PERIOD    2000
-#define LEADER_HEARTBEAT_PERIOD         3000
+#define LEADER_HEARTBEAT_PERIOD         6000
 
 const uint8_t MSG_ELECTION = 0xB0,
               MSG_ACK = 0xB1,
@@ -39,37 +40,38 @@ uint32_t electionTimeout, leaderHeartbeatTimeout;
 uint8_t heartbeatsLost = 0;
 
 void setup() {
-  pinMode(button_pin, INPUT);
-  digitalWrite(button_pin, HIGH);
   Serial.begin(57600);
   xbeeSerial.begin(57600);
   xbee.begin(xbeeSerial);
   delay(2000);
 
   initLedPins();
-  getMyAddress64();
-  leaderAddress64 = myAddress64;
-  sendCommand(0x0000FFFF, (uint8_t*)&MSG_DISCOVERY, 1);
-  leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
+  
+//  getMyAddress64();
+//  leaderAddress64 = myAddress64;
+//  sendCommand(0x0000FFFF, (uint8_t*)&MSG_DISCOVERY, 1);
+//  leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
 }
 
 void loop() {
   readAndHandlePackets();
-  if (isElecting && millis() > electionTimeout) {
-    isElecting = false;
-    if (isAcknowledged) beginElection();
-    else {
-      sendCommand(0x0000FFFF, (uint8_t*)&MSG_VICTORY, 1);
-      leaderAddress64 = myAddress64;
-      digitalWrite(PIN_BLUE_LED, HIGH);
-    }
-  }
-  if (millis() > leaderHeartbeatTimeout) {
-    if (leaderAddress64 == myAddress64) {
-      sendCommand(0x0000FFFF, (uint8_t*) &MSG_HEARTBEAT, 1);
-      leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
-    } else beginElection();
-  }
+//  if (isElecting && millis() > electionTimeout) {
+//    isElecting = false;
+//    if (isAcknowledged) beginElection();
+//    else {
+//      sendCommand(0x0000FFFF, (uint8_t*)&MSG_VICTORY, 1);
+//      leaderAddress64 = myAddress64;
+//      digitalWrite(PIN_BLUE_LED, HIGH);
+//    }
+//  }
+//  if (millis() > leaderHeartbeatTimeout) {
+//    if (leaderAddress64 == myAddress64) {
+//      sendCommand(0x0000FFFF, (uint8_t*) &MSG_HEARTBEAT, 1);
+//      leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
+//    } 
+    //else beginElection();
+//  }
+
   int reading = digitalRead(button_pin);
   if(reading != last_button_state)  debounce_timestamp = millis();
   if(millis() - debounce_timestamp > debounce_delay){
@@ -79,36 +81,42 @@ void loop() {
                 if (digitalRead(PIN_BLUE_LED)){
                   sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
                 }else if(digitalRead(PIN_GREEN_LED)){
+                  
                   digitalWrite(PIN_RED_LED,HIGH);
                   digitalWrite(PIN_GREEN_LED,LOW);
                   sendCommand(0x0000FFFF, (uint8_t*)&MSG_INFECTION, 1);
                 }       
       }
     }
+  }
+  last_button_state = reading;
 }
 
 void initLedPins(void) {
   pinMode(PIN_BLUE_LED, OUTPUT);
   pinMode(PIN_RED_LED, OUTPUT);
   pinMode(PIN_GREEN_LED, OUTPUT);
-
-  digitalWrite(PIN_BLUE_LED, HIGH);
+  pinMode(button_pin, INPUT);
+  digitalWrite(button_pin, HIGH);
+  digitalWrite(PIN_BLUE_LED, LOW);
   digitalWrite(PIN_RED_LED, LOW);
   digitalWrite(PIN_GREEN_LED, HIGH);
 }
 
-void getMyAddress64(void) {
-  do {
-    do    xbee.send(atRequest);
-    while (!xbee.readPacket(5000) || xbee.getResponse().getApiId() != AT_COMMAND_RESPONSE);
-
-    xbee.getResponse().getAtCommandResponse(atResponse);
-  } while (!atResponse.isOk());
-  memcpy(&myAddress64, atResponse.getValue(), 4);
-}
+//void getMyAddress64(void) {
+//  do {
+//    do    xbee.send(atRequest);
+//    while (!xbee.readPacket(5000) || xbee.getResponse().getApiId() != AT_COMMAND_RESPONSE);
+//
+//    xbee.getResponse().getAtCommandResponse(atResponse);
+//  } while (!atResponse.isOk());
+//  memcpy(&myAddress64, atResponse.getValue(), 4);
+//  Serial.print("myAddress64: ");
+//  Serial.println(myAddress64);
+//}
 
 void sendCommand(uint32_t destinationAddress64, uint8_t* payload, uint8_t length) {
-  Serial.print("MSG_OUT:");
+  Serial.print("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tMSG_OUT:");
   Serial.print(destinationAddress64);
   Serial.print(":");
   switch (payload[0]) {
@@ -124,32 +132,32 @@ void sendCommand(uint32_t destinationAddress64, uint8_t* payload, uint8_t length
   xbee.send(txRequest);
 }
 
-void beginElection(void) {
-  Serial.println("Began election");
-  if (isElecting)  return;
-  else isElecting = true;
-  isAcknowledged = false;
-  uint8_t countDevices = 0;
-  for (int i = 0; i < numDevices; i++)
-    if (listAddress64[i] > myAddress64) {
-      sendCommand(listAddress64[i], (uint8_t*) &MSG_ELECTION, 1);
-      countDevices++;
-    }
-  if (countDevices > 0) electionTimeout = millis() + ELECTION_REPLY_WAIT_PERIOD;
-  else electionTimeout = millis();
-}
+//void beginElection(void) {
+//  Serial.println("Began election");
+//  if (isElecting)  return;
+//  else isElecting = true;
+//  isAcknowledged = false;
+//  uint8_t countDevices = 0;
+//  for (int i = 0; i < numDevices; i++)
+//    if (listAddress64[i] > myAddress64) {
+//      sendCommand(listAddress64[i], (uint8_t*) &MSG_ELECTION, 1);
+//      countDevices++;
+//    }
+//  if (countDevices > 0) electionTimeout = millis() + ELECTION_REPLY_WAIT_PERIOD;
+//  else electionTimeout = millis();
+//}
 
 void readAndHandlePackets(void) {
   if (xbee.readPacket(1) && xbee.getResponse().getApiId() == ZB_RX_RESPONSE) {
     xbee.getResponse().getZBRxResponse(rxResponse);
     remoteAddress64 = rxResponse.getRemoteAddress64().getLsb();
-    if (remoteAddress64 > leaderAddress64) beginElection();     // VERIFY WHETHER YOU ACTUALLY NEED THIS
-    Serial.print("MSG_IN:");
-    Serial.print(remoteAddress64);
-    Serial.print(":");
+//    if (remoteAddress64 > leaderAddress64) beginElection();     // VERIFY WHETHER YOU ACTUALLY NEED THIS
+//    Serial.print("MSG_IN:");
+//    Serial.print(remoteAddress64);
+//    Serial.print(":");
     switch (rxResponse.getData(0)) {
       case MSG_DISCOVERY:
-        Serial.println("DISCOVERY");
+//        Serial.println("DISCOVERY");
         if (rxResponse.getDataLength() > 1) {
           memcpy(&leaderAddress64, rxResponse.getData() + 1, sizeof(leaderAddress64));
         } else {
@@ -165,15 +173,14 @@ void readAndHandlePackets(void) {
         break;
 
       case MSG_ELECTION:
-        Serial.println("ELECTION");
+//        Serial.println("ELECTION");
         sendCommand(remoteAddress64, (uint8_t*)&MSG_ACK, 1);
-        beginElection();
+        //beginElection();
         break;
 
       case MSG_ACK:
         if (isElecting) {
-          Serial.print("ACK");
-          Serial.println(remoteAddress64);
+//          Serial.println("ACK");
           electionTimeout = millis() + ELECTION_VICTORY_WAIT_PERIOD;
           isAcknowledged = true;
         }
@@ -181,15 +188,21 @@ void readAndHandlePackets(void) {
 
       case MSG_VICTORY:
         if (remoteAddress64 > myAddress64) {
-          Serial.println("VICTORY");
+//          Serial.println("VICTORY");
           leaderAddress64 = remoteAddress64;
           isElecting = false;
           digitalWrite(PIN_BLUE_LED, LOW);
         }
-        else beginElection();
+        //else beginElection();
         break;
-            case MSG_CLEAR:
-        if(!digitalRead(PIN_BLUE_LED)) digitalWrite(PIN_GREEN_LED , HIGH);
+
+        case MSG_CLEAR:
+        if(!digitalRead(PIN_BLUE_LED)) {
+          digitalWrite(PIN_GREEN_LED , HIGH);
+          digitalWrite(PIN_RED_LED, LOW);
+//          Serial.print("test command");
+        }
+        
         break;
 
       case MSG_INFECTION:
@@ -205,11 +218,3 @@ void readAndHandlePackets(void) {
     }
   }
 }
-
-
-
-
-
-
-
-
