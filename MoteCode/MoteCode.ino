@@ -19,6 +19,9 @@ const uint8_t MSG_ELECTION = 0xB0,
 
 const uint8_t slCommand[] = {'S', 'L'};
 
+unsigned long debounce_timestamp = 0, debounce_delay = 50;
+int button_state = LOW, last_button_state = LOW;
+
 XBee xbee = XBee();
 SoftwareSerial xbeeSerial(2, 3);
 ZBRxResponse rxResponse = ZBRxResponse();
@@ -36,6 +39,8 @@ uint32_t electionTimeout, leaderHeartbeatTimeout;
 uint8_t heartbeatsLost = 0;
 
 void setup() {
+  pinMode(button_pin, INPUT);
+  digitalWrite(button_pin, HIGH);
   Serial.begin(57600);
   xbeeSerial.begin(57600);
   xbee.begin(xbeeSerial);
@@ -65,6 +70,21 @@ void loop() {
       leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
     } else beginElection();
   }
+  int reading = digitalRead(button_pin);
+  if(reading != last_button_state)  debounce_timestamp = millis();
+  if(millis() - debounce_timestamp > debounce_delay){
+    if(reading != button_state){
+      button_state = reading;
+      if(button_state == LOW){
+                if (digitalRead(PIN_BLUE_LED)){
+                  sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
+                }else if(digitalRead(PIN_GREEN_LED)){
+                  digitalWrite(PIN_RED_LED,HIGH);
+                  digitalWrite(PIN_GREEN_LED,LOW);
+                  sendCommand(0x0000FFFF, (uint8_t*)&MSG_INFECTION, 1);
+                }       
+      }
+    }
 }
 
 void initLedPins(void) {
@@ -168,6 +188,16 @@ void readAndHandlePackets(void) {
         }
         else beginElection();
         break;
+            case MSG_CLEAR:
+        if(!digitalRead(PIN_BLUE_LED)) digitalWrite(PIN_GREEN_LED , HIGH);
+        break;
+
+      case MSG_INFECTION:
+        if(digitalRead(PIN_GREEN_LED)) {
+          digitalWrite(PIN_RED_LED, HIGH);
+          digitalWrite(PIN_GREEN_LED, LOW);
+        }
+        break;
 
       case MSG_HEARTBEAT:
         Serial.println("HEARTBEAT");
@@ -175,3 +205,11 @@ void readAndHandlePackets(void) {
     }
   }
 }
+
+
+
+
+
+
+
+
