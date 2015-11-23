@@ -7,7 +7,7 @@
 
 #define ELECTION_REPLY_WAIT_PERIOD      1000
 #define ELECTION_VICTORY_WAIT_PERIOD    2000
-#define LEADER_HEARTBEAT_PERIOD         3000
+#define LEADER_HEARTBEAT_PERIOD         6000
 
 const uint8_t MSG_ELECTION = 0xB0,
               MSG_ACK = 0xB1,
@@ -85,10 +85,12 @@ void getMyAddress64(void) {
     xbee.getResponse().getAtCommandResponse(atResponse);
   } while (!atResponse.isOk());
   memcpy(&myAddress64, atResponse.getValue(), 4);
+  Serial.print("myAddress64: ");
+  Serial.println(myAddress64);
 }
 
 void sendCommand(uint32_t destinationAddress64, uint8_t* payload, uint8_t length) {
-  Serial.print("MSG_OUT:");
+  Serial.print("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tMSG_OUT:");
   Serial.print(destinationAddress64);
   Serial.print(":");
   switch (payload[0]) {
@@ -152,8 +154,7 @@ void readAndHandlePackets(void) {
 
       case MSG_ACK:
         if (isElecting) {
-          Serial.print("ACK");
-          Serial.println(remoteAddress64);
+          Serial.println("ACK");
           electionTimeout = millis() + ELECTION_VICTORY_WAIT_PERIOD;
           isAcknowledged = true;
         }
