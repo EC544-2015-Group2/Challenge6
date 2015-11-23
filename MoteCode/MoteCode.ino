@@ -56,6 +56,7 @@ void loop() {
     else {
       sendCommand(0x0000FFFF, (uint8_t*)&MSG_VICTORY, 1);
       leaderAddress64 = myAddress64;
+      digitalWrite(PIN_BLUE_LED, HIGH);
     }
   }
   if(millis() > leaderHeartbeatTimeout){
@@ -71,7 +72,7 @@ void initLedPins(void) {
   pinMode(PIN_RED_LED, OUTPUT);
   pinMode(PIN_GREEN_LED, OUTPUT);
 
-  digitalWrite(PIN_BLUE_LED, LOW);
+  digitalWrite(PIN_BLUE_LED, HIGH);
   digitalWrite(PIN_RED_LED, LOW);
   digitalWrite(PIN_GREEN_LED, HIGH);
 }
@@ -109,7 +110,7 @@ void readAndHandlePackets(void) {
   if (xbee.readPacket(1) && xbee.getResponse().getApiId() == ZB_RX_RESPONSE) {
     xbee.getResponse().getZBRxResponse(rxResponse);
     remoteAddress64 = rxResponse.getRemoteAddress64().getLsb();
-    if (remoteAddress64 > myLeaderAddress64) beginElection();     // VERIFY WHETHER YOU ACTUALLY NEED THIS
+    if (remoteAddress64 > leaderAddress64) beginElection();     // VERIFY WHETHER YOU ACTUALLY NEED THIS
     switch (rxResponse.getData(0)) {
       case MSG_DISCOVERY:
         if (rxResponse.getDataLength() > 1) {
@@ -142,6 +143,7 @@ void readAndHandlePackets(void) {
         if (remoteAddress64 > myAddress64) {
           leaderAddress64 = remoteAddress64;
           isElecting = false;
+          digitalWrite(PIN_BLUE_LED, HIGH);
         }
         else beginElection();
         break;
