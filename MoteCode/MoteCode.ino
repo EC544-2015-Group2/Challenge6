@@ -10,8 +10,9 @@
 #define ELECTION_VICTORY_WAIT_PERIOD    3000
 #define LEADER_HEARTBEAT_PERIOD         6000
 #define IMMUNITY_PERIOD                 3000
-#define RDM_DELAY                       500 
+#define RDM_DELAY                       500
 #define MESSAGE_QUEUE                   100
+#define INFECTION_BROADCAST_PERIOD      3000
 
 const uint8_t MSG_ELECTION = 0xB0,
               MSG_ACK = 0xB1,
@@ -43,6 +44,7 @@ int debounce_timestamp = 0;
 int debounce_delay = 50;
 int lastClearedTimestamp = 0;
 int messageQueueTimestamp = 0;
+int infectionTimeout = 0;
 
 void setup() {
   Serial.begin(57600);
@@ -81,6 +83,10 @@ void loop() {
       digitalWrite(PIN_GREEN_LED, LOW);
       digitalWrite(PIN_RED_LED, HIGH);
       digitalWrite(PIN_BLUE_LED, LOW);
+      if (millis() - infectionTimeout > INFECTION_BROADCAST_PERIOD) {
+        sendCommand(0x0000FFFF, (uint8_t*)&MSG_INFECTION, 1);
+        infectionTimeout = millis();
+      }
     }
   } else if (leaderAddress64 == myAddress64) {
     int reading = digitalRead(PIN_BUTTON);
@@ -103,10 +109,10 @@ void loop() {
   }
   else digitalWrite(PIN_BLUE_LED, LOW);
   readAndHandlePackets();
-  if (isElecting && millis() > electionTimeout) { 
+  if (isElecting && millis() > electionTimeout) {
     isElecting = false;
     leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
-    if (isAcknowledged) beginElection();                              // I think this is a problem source - queueing of messages from every member with each ACK  
+    if (isAcknowledged) beginElection();                              // I think this is a problem source - queueing of messages from every member with each ACK
     else {
       sendCommand(0x0000FFFF, (uint8_t*)&MSG_VICTORY, 1);
       leaderAddress64 = myAddress64;
@@ -191,8 +197,8 @@ void beginElection(void) {
     }
   }
   if (countDevices > 0) electionTimeout = millis() + ELECTION_REPLY_WAIT_PERIOD;
-  else electionTimeout = millis() + RDM_DELAY;  // I think it is looping between this and the read packet function - this is the only timeout that is millis() 
-                                                // and it immediately satisfies the if (millis() > electionTimeout) logic. Give it at least 0.5sec.
+  else electionTimeout = millis() + RDM_DELAY;  // I think it is looping between this and the read packet function - this is the only timeout that is millis()
+  // and it immediately satisfies the if (millis() > electionTimeout) logic. Give it at least 0.5sec.
 }
 
 void readAndHandlePackets(void) {
@@ -208,12 +214,12 @@ void readAndHandlePackets(void) {
         inList = true;
     if (!inList) listAddress64[numDevices++] = remoteAddress64;
     switch (rxResponse.getData(0)) {
-      
-                                               // Prevent queueing: if messages arrive with a frequency greater than 250ms throw them out. May cause problems with CLEAR message,
-                                               // need to test.
-     if (millis() - messageQueueTimestamp < MESSAGE_QUEUE) break; 
-      messageQueueTimestamp = millis();
-      
+
+        // Prevent queueing: if messages arrive with a frequency greater than 250ms throw them out. May cause problems with CLEAR message,
+        // need to test.
+        if (millis() - messageQueueTimestamp < MESSAGE_QUEUE) break;
+        messageQueueTimestamp = millis();
+
       case MSG_DISCOVERY:
         if (rxResponse.getDataLength() > 1) {
           memcpy(&leaderAddress64, rxResponse.getData() + 1, sizeof(leaderAddress64));
