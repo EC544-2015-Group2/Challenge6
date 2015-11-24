@@ -7,7 +7,7 @@
 #define PIN_BUTTON                5     // infection toggle
 
 #define ELECTION_REPLY_WAIT_PERIOD      2000
-#define ELECTION_VICTORY_WAIT_PERIOD    3000
+#define ELECTION_VICTORY_WAIT_PERIOD    6000
 #define LEADER_HEARTBEAT_PERIOD         6000
 #define IMMUNITY_PERIOD                 3000
 #define RDM_DELAY                       500
@@ -68,6 +68,7 @@ void loop() {
         button_state = reading;
         if (button_state == LOW) {
           isInfected = true;
+          
           sendCommand(0x0000FFFF, (uint8_t*)&MSG_INFECTION, 1);
         }
       }
@@ -111,7 +112,7 @@ void loop() {
   readAndHandlePackets();
   if (isElecting && millis() > electionTimeout) {
     isElecting = false;
-    leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
+    leaderHeartbeatTimeout = millis() + 2 * LEADER_HEARTBEAT_PERIOD;
     if (isAcknowledged) beginElection();                              // I think this is a problem source - queueing of messages from every member with each ACK
     else {
       sendCommand(0x0000FFFF, (uint8_t*)&MSG_VICTORY, 1);
@@ -179,6 +180,7 @@ void serialLog(bool in, uint32_t address64, uint8_t payload) {
 void sendCommand(uint32_t destinationAddress64, uint8_t* payload, uint8_t length) {
   serialLog(false, destinationAddress64, payload[0]);
   txRequest = ZBTxRequest(XBeeAddress64(0x00000000, destinationAddress64), payload, length);
+  txRequest.setFrameId(0);
   xbee.send(txRequest);
 }
 
@@ -217,8 +219,8 @@ void readAndHandlePackets(void) {
 
         // Prevent queueing: if messages arrive with a frequency greater than 250ms throw them out. May cause problems with CLEAR message,
         // need to test.
-        if (millis() - messageQueueTimestamp < MESSAGE_QUEUE) break;
-        messageQueueTimestamp = millis();
+//        if (millis() - messageQueueTimestamp < MESSAGE_QUEUE) break;
+//        messageQueueTimestamp = millis();
 
       case MSG_DISCOVERY:
         if (rxResponse.getDataLength() > 1) {
@@ -240,20 +242,21 @@ void readAndHandlePackets(void) {
       case MSG_ACK:
         electionTimeout = millis() + ELECTION_VICTORY_WAIT_PERIOD;
         isAcknowledged = true;
-        break;
-
+        
       case MSG_VICTORY:
         if (remoteAddress64 > myAddress64) {
           leaderAddress64 = remoteAddress64;
           isElecting = false;
-          leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
+          leaderHeartbeatTimeout = millis() + 2 * LEADER_HEARTBEAT_PERIOD;
         }
         else beginElection();
         break;
 
       case MSG_HEARTBEAT:
         if (remoteAddress64 > leaderAddress64) leaderAddress64 = remoteAddress64;
+        delay(20);
         if (remoteAddress64 < myAddress64) beginElection();
+        delay(20);
         leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
         break;
 
