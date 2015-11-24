@@ -58,23 +58,18 @@ void setup() {
 }
 
 void loop() {
-  if (leaderAddress64 != myAddress64) {
-    int reading = digitalRead(PIN_BUTTON);
-    if (reading != last_button_state) debounce_timestamp = millis();
-    if (millis() - debounce_timestamp > debounce_delay) {
-      if (reading != button_state) {
-        button_state = reading;
-        if (button_state == LOW) {
-          if (leaderAddress64 == myAddress64) {
-            sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
-          } else {
-            isInfected = true;
-          }
-        }
+  int reading = digitalRead(PIN_BUTTON);
+  if (reading != last_button_state) debounce_timestamp = millis();
+  if (millis() - debounce_timestamp > debounce_delay) {
+    if (reading != button_state) {
+      button_state = reading;
+      if (button_state == LOW) {
+        if (leaderAddress64 == myAddress64) sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
+        else isInfected = true;
       }
     }
-    last_button_state = reading;
   }
+  last_button_state = reading;
 
   setLedStates();
   readAndHandlePackets();
