@@ -65,11 +65,10 @@ void loop() {
       if (reading != button_state) {
         button_state = reading;
         if (button_state == LOW) {
-          if(leaderAddress64 == myAddress64){
+          if (leaderAddress64 == myAddress64) {
             sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
           } else {
             isInfected = true;
-            sendCommand(0x0000FFFF, (uint8_t*)&MSG_INFECTION, 1);
           }
         }
       }
@@ -89,8 +88,8 @@ void loop() {
       leaderAddress64 = myAddress64;
     }
   }
-  if (!isElecting){
-    if(millis() > leaderHeartbeatTimeout) {
+  if (!isElecting) {
+    if (millis() > leaderHeartbeatTimeout) {
       if (leaderAddress64 == myAddress64) {
         sendCommand(0x0000FFFF, (uint8_t*) &MSG_HEARTBEAT, 1);
         leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
@@ -99,7 +98,7 @@ void loop() {
         beginElection();
       }
     }
-    if(isInfected && millis() > infectionRebroadcastTimeout){
+    if (leaderAddress64 != myAddress64 && isInfected && millis() > infectionRebroadcastTimeout) {
       sendCommand(0x0000FFFF, (uint8_t*) &MSG_INFECTION, 1);
       infectionRebroadcastTimeout = millis() + INFECTION_REBROADCAST_PERIOD;
     }
@@ -116,8 +115,8 @@ void initLedPins(void) {
   digitalWrite(PIN_GREEN_LED, HIGH);
 }
 
-void setLedStates(void){
-  if(isInfected){
+void setLedStates(void) {
+  if (isInfected) {
     digitalWrite(PIN_GREEN_LED, LOW);
     digitalWrite(PIN_RED_LED, HIGH);
   } else {
@@ -166,8 +165,20 @@ void serialLog(bool in, uint32_t address64, uint8_t payload) {
 
 void sendCommand(uint32_t destinationAddress64, uint8_t* payload, uint8_t length) {
   serialLog(false, destinationAddress64, payload[0]);
-  txRequest = ZBTxRequest(XBeeAddress64(0x00000000, destinationAddress64), payload, length);
-  xbee.send(txRequest);
+  if (payload[0] == MSG_DISCOVERY) {
+    txRequest = ZBTxRequest(XBeeAddress64(0x00000000, 0x0000FFFF), payload, length);
+    xbee.send(txRequest);
+  } else {
+    if (destinationAddress64 == 0x0000FFFF) {
+      for (int i = 0; i < numDevices; i++) {
+        txRequest = ZBTxRequest(XBeeAddress64(0x0013A200, listAddress64[i]), payload, length);
+        xbee.send(txRequest);
+      }
+    } else {
+      txRequest = ZBTxRequest(XBeeAddress64(0x0013A200, destinationAddress64), payload, length);
+      xbee.send(txRequest);
+    }
+  }
 }
 
 void beginElection(void) {
@@ -235,13 +246,13 @@ void readAndHandlePackets(void) {
         break;
 
       case MSG_HEARTBEAT:
-        if(myAddress64 == leaderAddress64){
-          if (remoteAddress64 > myAddress64) leaderAddress64 = remoteAddress64;  
+        if (myAddress64 == leaderAddress64) {
+          if (remoteAddress64 > myAddress64) leaderAddress64 = remoteAddress64;
         } else leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
         break;
 
       case MSG_INFECTION:
-        if (millis() > immunityTimeout && leaderAddress64 != myAddress64) 
+        if (millis() > immunityTimeout && leaderAddress64 != myAddress64)
           isInfected = true;
         break;
 
