@@ -4,10 +4,12 @@
 #define PIN_BLUE_LED              11    // leader
 #define PIN_RED_LED               12    // infected
 #define PIN_GREEN_LED             13    // clear
+#define PIN_BUTTON                5     // infection toggle
 
 #define ELECTION_REPLY_WAIT_PERIOD      1000
 #define ELECTION_VICTORY_WAIT_PERIOD    3000
 #define LEADER_HEARTBEAT_PERIOD         6000
+#define IMMUNITY_PERIOD                 3000
 
 const uint8_t MSG_ELECTION = 0xB0,
               MSG_ACK = 0xB1,
@@ -34,6 +36,10 @@ bool isInfected = false;
 bool isElecting = false, isAcknowledged = false;
 uint32_t electionTimeout, leaderHeartbeatTimeout;
 uint8_t heartbeatsLost = 0;
+int button_state = LOW, last_button_state = HIGH;
+int debounce_timestamp = 0;
+int debounce_delay = 50;
+int lastClearedTimestamp = 0;
 
 void setup() {
   Serial.begin(57600);
@@ -49,7 +55,49 @@ void setup() {
 }
 
 void loop() {
-  if (myAddress64 == leaderAddress64)  digitalWrite(PIN_BLUE_LED, HIGH);
+  if (leaderAddress64 != myAddress64) {
+    int reading = digitalRead(PIN_BUTTON);
+    if (reading != last_button_state) debounce_timestamp = millis();
+    if (millis() - debounce_timestamp > debounce_delay) {
+      if (reading != button_state) {
+        button_state = reading;
+        if (button_state == LOW) {
+          isInfected = true;
+          sendCommand(0x0000FFFF, (uint8_t*)&MSG_INFECTION, 1);
+        }
+      }
+    }
+    last_button_state = reading;
+
+    //LED CHANGES
+    if (isInfected == false) {
+      digitalWrite(PIN_GREEN_LED, HIGH);
+      digitalWrite(PIN_RED_LED, LOW);
+      digitalWrite(PIN_BLUE_LED, LOW);
+    } else if (isInfected == true) {
+      digitalWrite(PIN_GREEN_LED, LOW);
+      digitalWrite(PIN_RED_LED, HIGH);
+      digitalWrite(PIN_BLUE_LED, LOW);
+    }
+  } else if (leaderAddress64 == myAddress64) {
+    int reading = digitalRead(PIN_BUTTON);
+    if (reading != last_button_state) debounce_timestamp = millis();
+    if (millis() - debounce_timestamp > debounce_delay) {
+      if (reading != button_state) {
+        button_state = reading;
+        if (button_state == LOW) {
+          sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
+        }
+      }
+    }
+    last_button_state = reading;
+  }
+
+  if (myAddress64 == leaderAddress64) {
+    digitalWrite(PIN_BLUE_LED, HIGH);
+    digitalWrite(PIN_GREEN_LED, LOW);
+    digitalWrite(PIN_RED_LED, LOW);
+  }
   else digitalWrite(PIN_BLUE_LED, LOW);
   readAndHandlePackets();
   if (isElecting && millis() > electionTimeout) {
@@ -191,6 +239,28 @@ void readAndHandlePackets(void) {
         if (remoteAddress64 > leaderAddress64) leaderAddress64 = remoteAddress64;
         if (remoteAddress64 < myAddress64) beginElection();
         leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
+        break;
+
+      case MSG_INFECTION:
+        if (millis() - lastClearedTimestamp > IMMUNITY_PERIOD) {
+          if (leaderAddress64 != remoteAddress64) {
+            isInfected = true;
+            digitalWrite(PIN_RED_LED, HIGH);
+            digitalWrite(PIN_GREEN_LED, LOW);
+            sendCommand(0x0000FFFF, (uint8_t*)&MSG_INFECTION, 1);
+          }
+        }
+        break;
+
+      case MSG_CLEAR:
+        if (isInfected = true) {
+          isInfected = false;;
+          digitalWrite(PIN_RED_LED, LOW);
+          digitalWrite(PIN_GREEN_LED, HIGH);
+          sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
+          lastClearedTimestamp = millis();
+        }
+        break;
     }
   }
 }
