@@ -11,6 +11,7 @@
 #define ELECTION_BETWEEN_WAIT_PERIOD    5000
 #define LEADER_HEARTBEAT_PERIOD         6000
 #define IMMUNITY_PERIOD                 3000
+#define INFECTION_REBROADCAST_PERIOD    2000
 
 const uint8_t MSG_ELECTION = 0xB0,
               MSG_ACK = 0xB1,
@@ -41,7 +42,7 @@ int button_state = LOW, last_button_state = HIGH;
 int debounce_timestamp = 0;
 int debounce_delay = 50;
 
-uint32_t immunityTimeout;
+uint32_t immunityTimeout, infectionRebroadcastTimeout;
 
 void setup() {
   Serial.begin(57600);
@@ -88,17 +89,21 @@ void loop() {
       leaderAddress64 = myAddress64;
     }
   }
-  if (!isElecting && millis() > leaderHeartbeatTimeout) {
-    if (leaderAddress64 == myAddress64) {
-      sendCommand(0x0000FFFF, (uint8_t*) &MSG_HEARTBEAT, 1);
-      leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
-    } else {
-      Serial.println("Leader dead. Relecting");
-      beginElection();
+  if (!isElecting){
+    if(millis() > leaderHeartbeatTimeout) {
+      if (leaderAddress64 == myAddress64) {
+        sendCommand(0x0000FFFF, (uint8_t*) &MSG_HEARTBEAT, 1);
+        leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
+      } else {
+        Serial.println("Leader dead. Relecting");
+        beginElection();
+      }
+    }
+    if(isInfected && millis() > infectionRebroadcastTimeout){
+      sendCommand(0x0000FFFF, (uint8_t*) &MSG_INFECTION, 1);
+      infectionRebroadcastTimeout = millis() + INFECTION_REBROADCAST_PERIOD;
     }
   }
-
-  // Need to add code here to periodically rebroadcast infection if isInfected = true
 }
 
 void initLedPins(void) {
@@ -134,11 +139,6 @@ void getMyAddress64(void) {
 
     xbee.getResponse().getAtCommandResponse(atResponse);
   } while (!atResponse.isOk());
-  Serial.print("AT response: ");
-  for (int i = 0; i < atResponse.getValueLength(); i++) {
-    Serial.print(atResponse.getValue()[i], HEX);
-    Serial.print(" ");
-  }
   for (int i = 0; i < 4; i++) {
     uint32_t tempVal = atResponse.getValue()[i];
     myAddress64 |= tempVal << 8 * (3 - i);
@@ -235,9 +235,9 @@ void readAndHandlePackets(void) {
         break;
 
       case MSG_HEARTBEAT:
-        if (remoteAddress64 > leaderAddress64) leaderAddress64 = remoteAddress64;
-        if (remoteAddress64 < myAddress64) beginElection();
-        leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
+        if(myAddress64 == leaderAddress64){
+          if (remoteAddress64 > myAddress64) leaderAddress64 = remoteAddress64;  
+        } else leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
         break;
 
       case MSG_INFECTION:
@@ -248,7 +248,6 @@ void readAndHandlePackets(void) {
       case MSG_CLEAR:
         if (isInfected) {
           isInfected = false;
-          sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
           immunityTimeout = millis() + IMMUNITY_PERIOD;
         }
         break;
