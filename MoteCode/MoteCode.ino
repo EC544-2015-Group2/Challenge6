@@ -253,7 +253,7 @@ void readAndHandlePackets(void) {
 
       case MSG_INFECTION:
         if (millis() - lastClearedTimestamp > IMMUNITY_PERIOD) {
-          if (leaderAddress64 != remoteAddress64) {
+          if (leaderAddress64 != myAddress64) {
             isInfected = true;
             digitalWrite(PIN_RED_LED, HIGH);
             digitalWrite(PIN_GREEN_LED, LOW);
