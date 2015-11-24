@@ -11,7 +11,7 @@
 #define ELECTION_BETWEEN_WAIT_PERIOD    5000
 #define LEADER_HEARTBEAT_PERIOD         6000
 #define IMMUNITY_PERIOD                 3000
-#define INFECTION_REBROADCAST_PERIOD    2000
+#define INFECTION_REBROADCAST_PERIOD    4000
 
 const uint8_t MSG_ELECTION = 0xB0,
               MSG_ACK = 0xB1,
@@ -64,7 +64,10 @@ void loop() {
     if (reading != button_state) {
       button_state = reading;
       if (button_state == LOW) {
-        if (leaderAddress64 == myAddress64) sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
+        if (leaderAddress64 == myAddress64) {
+          sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
+          isInfected = false;
+        }
         else isInfected = true;
       }
     }
@@ -87,7 +90,7 @@ void loop() {
     if (millis() > leaderHeartbeatTimeout) {
       if (leaderAddress64 == myAddress64) {
         sendCommand(0x0000FFFF, (uint8_t*) &MSG_HEARTBEAT, 1);
-        leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 2;
+        leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD / 3;
       } else {
         Serial.println("Leader dead. Relecting");
         beginElection();
@@ -111,19 +114,20 @@ void initLedPins(void) {
 }
 
 void setLedStates(void) {
-  if (isInfected) {
-    digitalWrite(PIN_GREEN_LED, LOW);
-    digitalWrite(PIN_RED_LED, HIGH);
-  } else {
-    digitalWrite(PIN_GREEN_LED, HIGH);
-    digitalWrite(PIN_RED_LED, LOW);
-  }
-
   if (myAddress64 == leaderAddress64) {
     digitalWrite(PIN_BLUE_LED, HIGH);
     digitalWrite(PIN_GREEN_LED, LOW);
     digitalWrite(PIN_RED_LED, LOW);
-  } else digitalWrite(PIN_BLUE_LED, LOW);
+  } else {
+    digitalWrite(PIN_BLUE_LED, LOW);
+    if (isInfected) {
+      digitalWrite(PIN_GREEN_LED, LOW);
+      digitalWrite(PIN_RED_LED, HIGH);
+    } else {
+      digitalWrite(PIN_GREEN_LED, HIGH);
+      digitalWrite(PIN_RED_LED, LOW);
+    }
+  }
 }
 
 void getMyAddress64(void) {
@@ -160,7 +164,7 @@ void serialLog(bool in, uint32_t address64, uint8_t payload) {
 
 void sendCommand(uint32_t destinationAddress64, uint8_t* payload, uint8_t length) {
   serialLog(false, destinationAddress64, payload[0]);
-  if (payload[0] == MSG_DISCOVERY) {
+  if (payload[0] == MSG_DISCOVERY || payload[0] == MSG_VICTORY) {
     txRequest = ZBTxRequest(XBeeAddress64(0x00000000, 0x0000FFFF), payload, length);
     xbee.send(txRequest);
   } else {
@@ -242,7 +246,10 @@ void readAndHandlePackets(void) {
 
       case MSG_HEARTBEAT:
         if (myAddress64 == leaderAddress64) {
-          if (remoteAddress64 > myAddress64) leaderAddress64 = remoteAddress64;
+          if (remoteAddress64 > myAddress64){
+            leaderAddress64 = remoteAddress64;
+            leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
+          }
         } else leaderHeartbeatTimeout = millis() + LEADER_HEARTBEAT_PERIOD;
         break;
 
@@ -252,10 +259,8 @@ void readAndHandlePackets(void) {
         break;
 
       case MSG_CLEAR:
-        if (isInfected) {
-          isInfected = false;
-          immunityTimeout = millis() + IMMUNITY_PERIOD;
-        }
+        isInfected = false;
+        immunityTimeout = millis() + IMMUNITY_PERIOD;
         break;
     }
   }
