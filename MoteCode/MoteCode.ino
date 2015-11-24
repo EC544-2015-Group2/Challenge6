@@ -40,7 +40,8 @@ uint8_t heartbeatsLost = 0;
 int button_state = LOW, last_button_state = HIGH;
 int debounce_timestamp = 0;
 int debounce_delay = 50;
-int lastClearedTimestamp = 0;
+
+uint32_t immunityTimeout;
 
 void setup() {
   Serial.begin(57600);
@@ -240,7 +241,7 @@ void readAndHandlePackets(void) {
         break;
 
       case MSG_INFECTION:
-        if (millis() - lastClearedTimestamp > IMMUNITY_PERIOD && leaderAddress64 != myAddress64) 
+        if (millis() > immunityTimeout && leaderAddress64 != myAddress64) 
           isInfected = true;
         break;
 
@@ -248,7 +249,7 @@ void readAndHandlePackets(void) {
         if (isInfected) {
           isInfected = false;
           sendCommand(0x0000FFFF, (uint8_t*)&MSG_CLEAR, 1);
-          lastClearedTimestamp = millis();
+          immunityTimeout = millis() + IMMUNITY_PERIOD;
         }
         break;
     }
